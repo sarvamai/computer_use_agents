@@ -1,5 +1,7 @@
 # Computer Using Agent (CUA) with Morph Cloud Integration
 
+![Demo Video](assets/pkmncua.mp4)
+
 ## Computer Using Agents with Infinibranch 
 
 This fork enhances the OpenAI Computer Using Agent sample app with Morph Cloud integration, enabling powerful new capabilities for agents through environment snapshotting and Infinibranch technology.
