@@ -1,6 +1,9 @@
 # Computer Using Agent (CUA) with Morph Cloud Integration
 
-![Demo Video](assets/pkmncua.mp4)
+<video width="640" height="480" controls>
+  <source src="assets/pkmncua.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## Computer Using Agents with Infinibranch 
 
