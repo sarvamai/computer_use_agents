@@ -1,3 +1,54 @@
+# Computer Using Agent (CUA) with Morph Cloud Integration
+
+## Computer Using Agents with Infinibranch 
+
+This fork enhances the OpenAI Computer Using Agent sample app with Morph Cloud integration, enabling powerful new capabilities for agents through environment snapshotting and Infinibranch technology.
+
+[Apply for early access here](https://docs.google.com/forms/d/1F8JeJEJWwP5ywfmGN_N-r3MBNHVzry7k1Dg_2YEex28)
+
+### Key Contributions
+
+- **Autonomous Agent Implementation**: New autonomous agent capabilities for self-directed task completion
+- **MorphComputer**: Custom computer implementation that interfaces with Morph Cloud
+- **Branching Agent**: Agent that can create multiple branches from environment snapshots
+- **Branching Example**: Practical demonstration of Infinibranch technology in action
+
+### Key Benefits
+
+- **Instant Environment Access**: Jump directly into pre-configured environments without waiting for setup
+- **Infinibranch Technology**: Create multiple branches from a single snapshot for parallel exploration
+- **Persistent Environments**: Save agent state and resume work without losing progress
+- **Infrastructure Simplification**: Eliminates the need to manage Docker containers locally
+- **Remote Debian Desktop**: Access a fully-featured Linux environment in the cloud
+
+### Getting Started with Morph Cloud
+
+To use Morph Cloud with the CUA sample app:
+
+```bash
+# Set up Python environment
+python3 -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+
+# Install Morph Cloud and set API key
+pip install morphcloud
+export MORPH_API_KEY=your_api_key_here 
+
+# Run with Morph Cloud
+python cli.py --computer morph
+```
+
+### Exploring Infinibranch Capabilities
+
+Try our branching example to see how you can interactively create multiple agent exploration paths from a single environment snapshot:
+
+```bash
+python examples/branching_agent_example.py
+```
+
+This demonstrates how an agent can pursue different strategies in parallel by creating branches from a snapshot, then compare results across branches.
+
 # Computer Using Agent Sample App
 
 Get started building a [Computer Using Agent (CUA)](https://platform.openai.com/docs/guides/tools-computer-use) with the OpenAI API.
@@ -62,12 +113,6 @@ The `examples` folder contains more examples of how to use CUA.
 python -m examples.weather_example
 ```
 
-You can also try the simple branching example, which creates multiple Morph Computer branches from a single snapshot, demonstrating the power of Infinibranch:
-
-```shell
-python -m examples.simple_branch_example [--config]
-```
-
 For reference, the file `simple_cua_loop.py` implements the basics of the CUA loop.
 
 You can run it with:
@@ -100,7 +145,7 @@ This sample app provides a set of implemented `Computer` examples, but feel free
 | `Browserbase`       | browserbase        | `browser` | Remote browser environment        | [Browserbase](https://www.browserbase.com/) API key in `.env`    |
 | `ScrapybaraBrowser` | scrapybara-browser | `browser` | Remote browser environment        | [Scrapybara](https://scrapybara.com/dashboard) API key in `.env` |
 | `ScrapybaraUbuntu`  | scrapybara-ubuntu  | `linux`   | Remote Ubuntu desktop environment | [Scrapybara](https://scrapybara.com/dashboard) API key in `.env` |
-| `MorphComputer`  | morph | `linux`   | Remote Ubuntu desktop environment | [Morph Labs](https://cloud.morph.so/web/) API key in `.env` |
+| `MorphComputer`  | morph | `linux`   | Remote Debian desktop with snapshot & branching capabilities | [Morph Labs](https://cloud.morph.so/web/) API key in `.env` |
 
 
 Using the CLI, you can run the sample app with different computer environments using the options listed above:
