@@ -121,7 +121,7 @@ class Agent:
         # keep looping until we get a final response
         while new_items[-1].get("role") != "assistant" if new_items else True:
             self.debug_print([sanitize_message(msg) for msg in input_items + new_items])
-
+                
             response = create_response(
                 model=self.model,
                 input=input_items + new_items,
@@ -137,5 +137,6 @@ class Agent:
                 new_items += response["output"]
                 for item in response["output"]:
                     new_items += self.handle_item(item)
+
 
         return new_items

@@ -10,8 +10,8 @@ Get started building a [Computer Using Agent (CUA)](https://platform.openai.com/
 Set up python env and install dependencies.
 
 ```shell
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv env
+source env/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -26,6 +26,7 @@ Other included sample [computer environments](#computer-environments):
 - [Docker](https://docker.com/) (containerized desktop)
 - [Browserbase](https://www.browserbase.com/) (remote browser, requires account)
 - [Scrapybara](https://scrapybara.com) (remote browser or computer, requires account)
+- [Morph](https://cloud.morph.so/web/) (remote desktop, requires account)
 - ...or implement your own `Computer`!
 
 ## Overview
@@ -61,6 +62,12 @@ The `examples` folder contains more examples of how to use CUA.
 python -m examples.weather_example
 ```
 
+You can also try the simple branching example, which creates multiple Morph Computer branches from a single snapshot, demonstrating the power of Infinibranch:
+
+```shell
+python -m examples.simple_branch_example [--config]
+```
+
 For reference, the file `simple_cua_loop.py` implements the basics of the CUA loop.
 
 You can run it with:
@@ -93,6 +100,8 @@ This sample app provides a set of implemented `Computer` examples, but feel free
 | `Browserbase`       | browserbase        | `browser` | Remote browser environment        | [Browserbase](https://www.browserbase.com/) API key in `.env`    |
 | `ScrapybaraBrowser` | scrapybara-browser | `browser` | Remote browser environment        | [Scrapybara](https://scrapybara.com/dashboard) API key in `.env` |
 | `ScrapybaraUbuntu`  | scrapybara-ubuntu  | `linux`   | Remote Ubuntu desktop environment | [Scrapybara](https://scrapybara.com/dashboard) API key in `.env` |
+| `MorphComputer`  | morph | `linux`   | Remote Ubuntu desktop environment | [Morph Labs](https://cloud.morph.so/web/) API key in `.env` |
+
 
 Using the CLI, you can run the sample app with different computer environments using the options listed above:
 
