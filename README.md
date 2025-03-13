@@ -1,9 +1,6 @@
 # Computer Using Agent (CUA) with Morph Cloud Integration
 
-<video width="640" height="480" controls>
-  <source src="assets/pkmncua.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
+[Pokemon Infinibranch](https://github.com/user-attachments/assets/1cafcd3f-89d5-4618-b5b6-09e17c90526b)
 
 ## Computer Using Agents with Infinibranch 
 
