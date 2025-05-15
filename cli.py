@@ -1,5 +1,6 @@
 import argparse
 from agent.agent import Agent
+from agent.autonomous_agent import AutonomousAgent
 from computers import (
     BrowserbaseBrowser,
     ScrapybaraBrowser,
@@ -70,23 +71,22 @@ def main():
     ComputerClass = computer_mapping[args.computer]
 
     with ComputerClass() as computer:
-        agent = Agent(
-            computer=computer,
-            acknowledge_safety_check_callback=lambda message: True,
-        )
+        system_prompt = "You are a helpful computer use agent who has exceptional software engineering skills and cause computer with great efficiency. Use firefox for browser, for coding use terminal. Solve the task specified by user and whenever stuck use the internet to help yourself."
+        agent = AutonomousAgent(initial_task=args.input, computer=computer, system_prompt=system_prompt, max_steps=1000)
         items = []
+        agent.start(blocking=True)
 
-        while True:
-            user_input = args.input or input("> ")
-            items.append({"role": "user", "content": user_input})
-            output_items = agent.run_full_turn(
-                items,
-                print_steps=True,
-                show_images=args.show,
-                debug=args.debug,
-            )
-            items += output_items
-            args.input = None
+        # while True:
+        #     user_input = args.input or input("> ")
+        #     items.append({"role": "user", "content": user_input})
+        #     output_items = agent.run_full_turn(
+        #         items,
+        #         print_steps=True,
+        #         show_images=args.show,
+        #         debug=args.debug,
+        #     )
+        #     items += output_items
+        #     args.input = None
 
 
 if __name__ == "__main__":
