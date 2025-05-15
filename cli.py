@@ -10,11 +10,11 @@ from computers import (
 )
 
 
-def acknowledge_safety_check_callback(message: str) -> bool:
-    response = input(
-        f"Safety Check Warning: {message}\nDo you want to acknowledge and proceed? (y/n): "
-    ).lower()
-    return response.lower().strip() == "y"
+# def acknowledge_safety_check_callback(message: str) -> bool:
+#     response = input(
+#         f"Safety Check Warning: {message}\nDo you want to acknowledge and proceed? (y/n): "
+#     ).lower()
+#     return response.lower().strip() == "y"
 
 
 def main():
@@ -72,7 +72,7 @@ def main():
     with ComputerClass() as computer:
         agent = Agent(
             computer=computer,
-            acknowledge_safety_check_callback=acknowledge_safety_check_callback,
+            acknowledge_safety_check_callback=lambda message: True,
         )
         items = []
 

@@ -48,17 +48,12 @@ def sanitize_message(msg: dict) -> dict:
 
 
 def create_response(**kwargs):
-    url = "https://api.openai.com/v1/responses"
+    url = os.getenv("AZURE_OPENAI_ENDPOINT")
     headers = {
-        "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+        "Authorization": f"Bearer {os.getenv('AZURE_OPENAI_API_KEY')}",
         "Content-Type": "application/json",
-        # TODO: remove for launch
-        "Openai-beta": "responses=v1",
+        "api-version": "2025-03-01-preview",
     }
-
-    openai_org = os.getenv("OPENAI_ORG")
-    if openai_org:
-        headers["Openai-Organization"] = openai_org
 
     response = requests.post(url, headers=headers, json=kwargs)
 

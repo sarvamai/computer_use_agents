@@ -81,7 +81,7 @@ class MorphComputer:
             if self.skip_verification:
                 print(f"Skip verification flag is set. Starting instance from snapshot {self.snapshot_id} without validation...")
                 try:
-                    self.instance = self.client.instances.start(self.snapshot_id)
+                    self.instance = self.client.instances.start(self.snapshot_id, ttl_seconds=600)
                     self.instance_id = self.instance.id
                     print(f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}")
                 except Exception as e:
@@ -115,13 +115,13 @@ class MorphComputer:
         
         # If no instance_id or valid snapshot_id was provided, use the standard initialization
         if not self.instance_id and not self.snapshot_id:
-            # First try to find snapshots with remote-desktop-use metadata (fully setup)
-            snapshots = self.client.snapshots.list(metadata={"type": "remote-desktop-use"})
+            # First try to find snapshots with computer-dev-04072025 metadata (fully setup)
+            snapshots = self.client.snapshots.list(metadata={"type": "computer-dev-04072025"})
             
             if snapshots:
-                # Use the most recent remote-desktop-use snapshot
+                # Use the most recent computer-dev-04072025 snapshot
                 snapshot = snapshots[0]
-                print(f"Found remote-desktop-use snapshot: {snapshot.id}")
+                print(f"Found computer-dev-04072025 snapshot: {snapshot.id}")
                 print(f"Starting instance from ready-to-use snapshot: {snapshot.id}...")
                 self.instance = self.client.instances.start(snapshot.id)
                 print(f"Instance: {self.instance.id}")
@@ -144,7 +144,7 @@ class MorphComputer:
                     print(f"Created use snapshot with ID: {use_snapshot.id}")
                     
                     metadata = {
-                        "type": "remote-desktop-use",
+                        "type": "computer-dev-04072025",
                         "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
                     }
                     print(f"Setting metadata on use snapshot {use_snapshot.id}: {metadata}")
@@ -231,7 +231,7 @@ class MorphComputer:
         # Install required packages
         print("Installing required packages...")
         packages = [
-            "xfce4", "xfce4-goodies", "tigervnc-standalone-server", "tigervnc-common",
+            "lightdm", "xfce4", "xfce4-goodies", "tigervnc-standalone-server", "tigervnc-common",
             "python3", "python3-pip", "python3-websockify", "git", "net-tools", 
             "nginx", "dbus", "dbus-x11", "xfonts-base", "xdotool", "imagemagick"
         ]
@@ -252,26 +252,27 @@ class MorphComputer:
             self._exec(f"mkdir -p /root/.config/{directory}")
         
         # Create VNC server service
-        vncserver_service = """
-[Unit]
-Description=VNC Server for X11
-After=syslog.target network.target
+            vncserver_service = """
+    [Unit]
+    Description=VNC Server for X11
+    After=syslog.target network.target
 
-[Service]
-Type=simple
-User=root
-Environment=HOME=/root
-Environment=DISPLAY=:1
-ExecStartPre=-/bin/rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
-ExecStart=/usr/bin/Xvnc :1 -geometry 1280x800 -depth 24 -SecurityTypes None -localhost no
-Restart=on-failure
-RestartSec=5
+    [Service]
+    Type=simple
+    User=root
+    Environment=HOME=/root
+    Environment=DISPLAY=:1
+    ExecStartPre=-/bin/rm -f /tmp/.X1-lock /tmp/.X11-unix/X1
+    ExecStart=/usr/bin/Xvnc :1 -geometry 1280x800 -depth 24 -SecurityTypes None -localhost no
+    Restart=on-failure
+    RestartSec=5
 
-[Install]
-WantedBy=multi-user.target
-"""
+    [Install]
+    WantedBy=multi-user.target
+    """
         self._exec(f"cat > /etc/systemd/system/vncserver.service << 'EOF'\n{vncserver_service}\nEOF")
-        
+        self._exec(f"cat > /etc/systemd/system/novnc.service << 'EOF'\n{vncserver_service}\nEOF")
+
         # Create and configure other services (abbreviated)
         session_script = """#!/bin/bash
 export DISPLAY=:1
@@ -297,12 +298,23 @@ exec startxfce4
 """
         self._exec(f"cat > /usr/local/bin/start-xfce-session << 'EOF'\n{session_script}\nEOF")
         self._exec("chmod +x /usr/local/bin/start-xfce-session")
+        self._exec("./usr/local/bin/start-xfce-session")
         
         # Create and start services
         services = ["vncserver", "xfce-session", "novnc", "nginx"]
         self._exec("systemctl daemon-reload")
         for service in services:
-            self._exec(f"systemctl enable {service} && systemctl restart {service}")
+            if service == "xfce-session":
+                self._exec("systemctl enable lightdm")
+                self._exec("systemctl start lightdm")
+                self._exec("echo 'exec startxfce4' > ~/.xinitrc")
+                self._exec("./usr/local/bin/start-xfce-session")
+            elif service == "novnc":
+                self._exec("systemctl daemon-reload")
+                self._exec("systemctl enable novnc")
+                self._exec("systemctl start novnc")
+            else:
+                self._exec(f"systemctl enable {service} && systemctl restart {service}")
         
         # Expose HTTP service
         self.instance.expose_http_service("desktop", 80)
@@ -329,7 +341,7 @@ exec startxfce4
             print(f"Error details: {traceback.format_exc()}")
             # Continue setup even if snapshot creation fails
         
-        # Now install the additional tools needed for remote-desktop-use
+        # Now install the additional tools needed for computer-dev-04072025
         tools = {
             "xdotool": "xdotool",
             "imagemagick": "imagemagick"
@@ -346,7 +358,7 @@ exec startxfce4
             print(f"Created use snapshot with ID: {use_snapshot.id}")
             
             metadata = {
-                "type": "remote-desktop-use",
+                "type": "computer-dev-04072025",
                 "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
             }
             print(f"Setting metadata on use snapshot {use_snapshot.id}: {metadata}")
@@ -362,7 +374,7 @@ exec startxfce4
         # Skip if using a ready-to-use snapshot
         try:
             snapshot_info = self.client.snapshots.get(self.instance.snapshot_id)
-            if snapshot_info.metadata.get("type") == "remote-desktop-use":
+            if snapshot_info.metadata.get("type") == "computer-dev-04072025":
                 print("Using ready-to-use desktop snapshot, all tools already installed")
                 return
         except:
@@ -397,15 +409,15 @@ exec startxfce4
                 self._exec(f"apt-get update && apt-get install -y {package}")
                 tools_installed = True
         
-        # Create a use snapshot if we upgraded from remote-desktop to remote-desktop-use
+        # Create a use snapshot if we upgraded from remote-desktop to computer-dev-04072025
         if is_remote_desktop and tools_installed and self.setup_if_needed:
             try:
-                print("Creating remote-desktop-use snapshot for future use...")
+                print("Creating computer-dev-04072025 snapshot for future use...")
                 use_snapshot = self.instance.snapshot()
                 print(f"Created upgrade snapshot with ID: {use_snapshot.id}")
                 
                 metadata = {
-                    "type": "remote-desktop-use",
+                    "type": "computer-dev-04072025",
                     "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
                 }
                 print(f"Setting metadata on upgrade snapshot {use_snapshot.id}: {metadata}")
