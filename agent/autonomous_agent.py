@@ -112,17 +112,60 @@ class AutonomousAgent:
         
         # Handle storage folder and create subfolder if branch_id is specified
         self.storage_folder = storage_folder
-        if self.storage_folder and self.branch_id:
-            # Create branch-specific subfolder
-            branch_folder = os.path.join(self.storage_folder, str(self.branch_id))
-            os.makedirs(branch_folder, exist_ok=True)
-            self.storage_folder = branch_folder
-            if self.verbose_boot:
-                branch_prefix = f"[{self.branch_id}] "
-                console.print(f"[bold cyan]{branch_prefix}Created storage folder: {self.storage_folder}[/]")
-        elif self.storage_folder:
+        if self.storage_folder:
             # Ensure the main storage folder exists
             os.makedirs(self.storage_folder, exist_ok=True)
+            
+            # If branch_id is provided, create a branch-specific subfolder
+            if self.branch_id:
+                branch_folder = os.path.join(self.storage_folder, str(self.branch_id))
+                os.makedirs(branch_folder, exist_ok=True)
+                self.storage_folder = branch_folder
+                if self.verbose_boot:
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                    console.print(f"[bold cyan]{branch_prefix}Created branch storage folder: {self.storage_folder}[/]")
+            elif self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                console.print(f"[bold cyan]{branch_prefix}Using storage folder: {self.storage_folder}[/]")
+                
+            # Create a JSON file with agent configuration details
+            if self.storage_folder:
+                try:
+                    # Get computer instance info if available
+                    instance_id = None
+                    snapshot_id = None
+                    if computer and hasattr(computer, 'instance') and hasattr(computer.instance, 'id'):
+                        instance_id = computer.instance.id
+                    if computer and hasattr(computer, 'snapshot_id'):
+                        snapshot_id = computer.snapshot_id
+                        
+                    # Create configuration data
+                    config_data = {
+                        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "branch_id": self.branch_id,
+                        "model": model,
+                        "system_prompt": system_prompt,
+                        "initial_task": initial_task,
+                        "max_steps": max_steps,
+                        "step_delay": step_delay,
+                        "temperature": temperature,
+                        "instance_id": instance_id,
+                        "snapshot_id": snapshot_id,
+                        "environment": computer.environment if computer else None
+                    }
+                    
+                    # Write configuration to file
+                    config_file = os.path.join(self.storage_folder, "agent_config.json")
+                    with open(config_file, 'w') as f:
+                        json.dump(config_data, f, indent=2)
+                        
+                    if self.verbose_boot:
+                        branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                        console.print(f"[bold green]{branch_prefix}Created configuration file: {config_file}[/]")
+                except Exception as e:
+                    # Don't fail initialization if config creation fails
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                    console.print(f"[bold red]{branch_prefix}Error creating configuration file: {str(e)}[/]")
         
         if self.verbose_boot:
             branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
@@ -160,6 +203,7 @@ class AutonomousAgent:
         if self.suppress_original_prints:
             self.agent.print_steps = False
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold yellow]{branch_prefix}Suppressed original agent print statements[/]")
         
         # We handle "done" tool calls directly in the _run_loop method
@@ -182,6 +226,7 @@ class AutonomousAgent:
         self.thread = None
         
         if self.verbose_boot:
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
             console.print(f"[bold green]{branch_prefix}Autonomous agent initialized successfully[/]")
     
     def start(self, computer=None, blocking=False):
@@ -209,15 +254,18 @@ class AutonomousAgent:
         if computer:
             self.agent.computer = computer
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold cyan]{branch_prefix}Using provided computer instance[/]")
             
         if blocking:
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold cyan]{branch_prefix}Running in blocking mode[/]")
             self._run_loop()
             return None
         else:
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold cyan]{branch_prefix}Starting agent in separate thread[/]")
             self.thread = threading.Thread(
                 target=self._run_loop,
@@ -225,6 +273,7 @@ class AutonomousAgent:
             )
             self.thread.start()
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold green]{branch_prefix}Agent thread started successfully[/]")
             return self.thread
     
@@ -239,12 +288,15 @@ class AutonomousAgent:
         
         if self.thread and self.thread.is_alive():
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold yellow]{branch_prefix}Waiting for agent thread to terminate...[/]")
             self.thread.join(timeout=1.0)
             if self.verbose_boot:
                 if self.thread.is_alive():
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                     console.print(f"[bold red]{branch_prefix}Thread did not terminate within timeout[/]")
                 else:
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                     console.print(f"[bold green]{branch_prefix}Agent thread terminated successfully[/]")
     
     def _custom_print_wrapper(self, original_print_steps):
@@ -298,6 +350,7 @@ class AutonomousAgent:
                             title=f"{branch_prefix}Initial Task", border_style="blue"))
         
         if self.verbose_boot:
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
             console.print(f"[bold cyan]{branch_prefix}Initializing agent run loop[/]")
             console.print(f"[bold cyan]{branch_prefix}Initial task length: {len(self.initial_task)} characters[/]")
             
@@ -305,6 +358,7 @@ class AutonomousAgent:
         if self.branch_id and self.agent:
             self.agent.branch_id = self.branch_id
             if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                 console.print(f"[bold cyan]{branch_prefix}Injected branch ID into agent[/]")
         
         try:
@@ -327,7 +381,8 @@ class AutonomousAgent:
                 )
                 
                 if "output" not in response:
-                    console.print("[bold red]No output from model[/]")
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                    console.print(f"[bold red]{branch_prefix}No output from model[/]")
                     self.running = False
                     return
                 
@@ -382,6 +437,7 @@ class AutonomousAgent:
             tb = traceback.format_exc()
             
             # Display error with traceback
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
             console.print(f"[bold red]{branch_prefix}Error in initial task: {str(e)}[/]")
             console.print(f"[bold red]{branch_prefix}Traceback:[/]\n{tb}")
             
@@ -395,6 +451,7 @@ class AutonomousAgent:
             return
         
         # Continue with follow-up steps
+        branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
         console.print(f"[bold green]{branch_prefix}Starting follow-up steps (max: {self.max_steps})[/]")
         
         while self.running and self.steps_taken < self.max_steps:
@@ -437,7 +494,8 @@ class AutonomousAgent:
                     )
                     
                     if "output" not in response:
-                        console.print("[bold red]No output from model[/]")
+                        branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                        console.print(f"[bold red]{branch_prefix}No output from model[/]")
                         break
                     
                     # Add the output to our conversation

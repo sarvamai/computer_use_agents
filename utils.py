@@ -52,14 +52,24 @@ def create_response(**kwargs):
     headers = {
         "Authorization": f"Bearer {os.getenv('AZURE_OPENAI_API_KEY')}",
         "Content-Type": "application/json",
-        "api-version": "2025-03-01-preview",
+        "api-version": "2025-04-01-preview",
     }
 
     response = requests.post(url, headers=headers, json=kwargs)
 
     if response.status_code != 200:
-        print(f"Error: {response.status_code} {response.text}")
-
+        error_msg = f"Error: {response.status_code} {response.text}"
+        print(error_msg)
+        # Return a structured error response with an empty output field
+        # so the agent can continue its loop
+        return {
+            "error": {
+                "code": response.status_code,
+                "message": error_msg
+            },
+            "output": []
+        }
+        
     return response.json()
 
 

@@ -210,6 +210,9 @@ class BranchingAgent:
             
             # Create agent kwargs for this specific branch
             branch_agent_kwargs = agent_kwargs.copy()
+            
+            # No need to modify storage_folder - let AutonomousAgent constructor handle this
+            
             branch_agent_kwargs.update({
                 "tools": branch_tools,
                 "initial_task": full_instruction,
@@ -217,8 +220,7 @@ class BranchingAgent:
                 "branch_id": branch_id,
                 "callback": lambda step, action, response, bid=branch_id: self.agent_callback(bid, step, action, response) if self.agent_callback else None,
                 "suppress_original_prints": True,
-                "verbose_boot": False,
-                "storage_folder": f"{branch_id}_storage" # Pass storage_folder to each branch agent
+                "verbose_boot": False
             })
             
             console.print(f"[bold yellow]Branch {branch_id} - Creating autonomous agent...[/]")
