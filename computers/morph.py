@@ -75,7 +75,7 @@ class MorphComputer:
             # Check if instance is running
             if self.instance.status != "running":
                 print(f"Starting instance {self.instance_id}...")
-                self.instance = self.client.instances.start(self.instance_id)
+                self.instance = self.client.instances.start(self.instance_id, ttl_seconds=600)
         # If a specific snapshot_id was provided, use it to create the instance
         elif self.snapshot_id:
             if self.skip_verification:
@@ -104,7 +104,7 @@ class MorphComputer:
                     
                     if self.snapshot_id:  # If still using the snapshot after validation
                         print(f"Starting instance from provided snapshot: {self.snapshot_id}...")
-                        self.instance = self.client.instances.start(self.snapshot_id)
+                        self.instance = self.client.instances.start(self.snapshot_id, ttl_seconds=600)
                         self.instance_id = self.instance.id
                         print(f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}")
                 except Exception as e:
@@ -123,7 +123,7 @@ class MorphComputer:
                 snapshot = snapshots[0]
                 print(f"Found computer-dev-04072025 snapshot: {snapshot.id}")
                 print(f"Starting instance from ready-to-use snapshot: {snapshot.id}...")
-                self.instance = self.client.instances.start(snapshot.id)
+                self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
                 print(f"Instance: {self.instance.id}")
             else:
                 # If not found, try with regular remote-desktop metadata (needs tools)
@@ -134,7 +134,7 @@ class MorphComputer:
                     snapshot = snapshots[0]
                     print(f"Found remote-desktop snapshot: {snapshot.id}")
                     print(f"Starting instance from remote-desktop snapshot: {snapshot.id}...")
-                    self.instance = self.client.instances.start(snapshot.id)
+                    self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
                     print(f"Instance: {self.instance.id}")
                     
                     # Ensure required tools are installed
@@ -155,7 +155,7 @@ class MorphComputer:
                     # Create a new instance from scratch
                     print("No suitable snapshot found. Creating new instance...")
                     snapshot = self._get_or_create_snapshot(self.vcpus, self.memory, self.disk_size)
-                    self.instance = self.client.instances.start(snapshot.id)
+                    self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
                     
                     # Set up full remote desktop environment if needed
                     if self.setup_if_needed:
