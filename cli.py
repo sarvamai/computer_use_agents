@@ -1,4 +1,5 @@
 import argparse
+import os
 from agent.agent import Agent
 from agent.autonomous_agent import AutonomousAgent
 from agent.branching_agent import BranchingAgent
@@ -117,7 +118,18 @@ def main():
         help="Number of branches to create.",
         default=3,
     )
+    parser.add_argument(
+        "--storage-folder",
+        type=str,
+        help="Folder path for storing agent data. Will be created if it doesn't exist.",
+        default="./agent_storage",
+    )
     args = parser.parse_args()
+
+    # Ensure storage folder exists
+    if args.storage_folder:
+        os.makedirs(args.storage_folder, exist_ok=True)
+        print(f"Storage folder initialized at: {args.storage_folder}")
 
     computer_mapping = {
         "local-playwright": LocalPlaywrightComputer,
@@ -132,7 +144,13 @@ def main():
 
     with ComputerClass() as computer:
         system_prompt = SYSTEM_PROMPT
-        agent = BranchingAgent(computer=computer, agent_kwargs={"initial_task": args.input, "system_prompt": system_prompt, "max_steps": 1000})
+        agent_kwargs = {
+            "initial_task": args.input, 
+            "system_prompt": system_prompt, 
+            "max_steps": 1000,
+            "storage_folder": args.storage_folder
+        }
+        agent = BranchingAgent(computer=computer, agent_kwargs=agent_kwargs)
         agent.shared_context = args.input
         agent.branch_instructions = []
         for i in range(args.num_branches):
@@ -147,21 +165,6 @@ def main():
         
         # Display results
         agent.display_results()
-        # agent = AutonomousAgent(initial_task=args.input, computer=computer, system_prompt=system_prompt, max_steps=1000)
-        # items = []
-        # agent.start(blocking=True)
-
-        # while True:
-        #     user_input = args.input or input("> ")
-        #     items.append({"role": "user", "content": user_input})
-        #     output_items = agent.run_full_turn(
-        #         items,
-        #         print_steps=True,
-        #         show_images=args.show,
-        #         debug=args.debug,
-        #     )
-        #     items += output_items
-        #     args.input = None
 
 
 if __name__ == "__main__":

@@ -217,7 +217,8 @@ class BranchingAgent:
                 "branch_id": branch_id,
                 "callback": lambda step, action, response, bid=branch_id: self.agent_callback(bid, step, action, response) if self.agent_callback else None,
                 "suppress_original_prints": True,
-                "verbose_boot": False
+                "verbose_boot": False,
+                "storage_folder": f"{branch_id}_storage" # Pass storage_folder to each branch agent
             })
             
             console.print(f"[bold yellow]Branch {branch_id} - Creating autonomous agent...[/]")
@@ -447,5 +448,3 @@ class BranchingAgent:
                 console.print("[green]Cleaned up main computer[/]")
             except Exception as e:
                 console.print(f"[bold red]Error cleaning up main computer: {e}[/]")
-
-

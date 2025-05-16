@@ -6,6 +6,7 @@ import time
 import threading
 import json
 import random
+import os
 from typing import List, Dict, Any, Optional, Callable, Union
 
 from rich.console import Console
@@ -81,7 +82,8 @@ class AutonomousAgent:
         computer=None,
         branch_id=None,
         suppress_original_prints: bool = True,
-        verbose_boot: bool = False
+        verbose_boot: bool = False,
+        storage_folder: str = None
     ):
         """
         Initialize an autonomous agent.
@@ -99,6 +101,7 @@ class AutonomousAgent:
             branch_id: Optional identifier for the branch this agent is running in
             suppress_original_prints: Whether to suppress original agent's print statements
             verbose_boot: Whether to show verbose debugging during agent boot
+            storage_folder: Optional path to a folder for storing agent data
         """
         # Store branch id
         self.branch_id = branch_id
@@ -106,6 +109,20 @@ class AutonomousAgent:
         # Add new parameters
         self.suppress_original_prints = suppress_original_prints
         self.verbose_boot = verbose_boot
+        
+        # Handle storage folder and create subfolder if branch_id is specified
+        self.storage_folder = storage_folder
+        if self.storage_folder and self.branch_id:
+            # Create branch-specific subfolder
+            branch_folder = os.path.join(self.storage_folder, str(self.branch_id))
+            os.makedirs(branch_folder, exist_ok=True)
+            self.storage_folder = branch_folder
+            if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] "
+                console.print(f"[bold cyan]{branch_prefix}Created storage folder: {self.storage_folder}[/]")
+        elif self.storage_folder:
+            # Ensure the main storage folder exists
+            os.makedirs(self.storage_folder, exist_ok=True)
         
         if self.verbose_boot:
             branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
