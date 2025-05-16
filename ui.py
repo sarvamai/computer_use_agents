@@ -81,58 +81,75 @@ You are Manas, an advanced operational agent built by the Sarvam team. You combi
 # Streamlit styling
 STREAMLIT_STYLE = """
 <style>
-    /* Custom styles for the chat interface */
+    /* Simplified chat interface */
     .chat-message {
-        padding: 1.5rem;
+        padding: 1rem;
         border-radius: 0.5rem;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
         display: flex;
         flex-direction: column;
     }
     .chat-message.user {
         background-color: #f0f2f6;
+        border-left: 4px solid #2e7d32;
     }
     .chat-message.assistant {
-        background-color: #e3f2fd;
-    }
-    .chat-message .avatar {
-        width: 20px;
-        height: 20px;
-        margin-right: 8px;
+        background-color: #ffffff;
+        border-left: 4px solid #1976d2;
     }
     .chat-message .content {
-        display: flex;
-        flex-direction: column;
-        margin-top: 0.5rem;
+        margin-top: 0.25rem;
     }
-    /* Make the desktop view fill its container */
+    /* Simplified desktop view */
     .desktop-view {
         width: 100%;
-        height: 600px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        height: 500px;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background-color: #ffffff;
     }
-    /* Hide the streamlit deploy button */
+    /* Hide streamlit elements */
     .stAppDeployButton {
-        visibility: hidden;
+        display: none;
+    }
+    /* Main container styling */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    /* Sidebar styling */
+    .css-1d391kg {
+        background-color: #f8f9fa;
     }
 </style>
 """
+
 
 # Message container for the chat interface
 def message_container(is_user, content, key=None):
     container = st.container()
     with container:
         if is_user:
-            st.markdown(f'<div class="chat-message user"><div class="content">{content}</div></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="chat-message user"><div class="content">{content}</div></div>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown(f'<div class="chat-message assistant"><div class="content">{content}</div></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="chat-message assistant"><div class="content">{content}</div></div>',
+                unsafe_allow_html=True,
+            )
     return container
+
 
 # Capture and display screenshots/browser views
 def display_browser_view(url, container):
-    container.markdown(f'<div class="desktop-view"><iframe src="{url}" width="100%" height="600px"></iframe></div>', unsafe_allow_html=True)
+    container.markdown(
+        f'<div class="desktop-view"><iframe src="{url}" width="100%" height="600px"></iframe></div>',
+        unsafe_allow_html=True,
+    )
     container.write(f"Current URL: {url}")
+
 
 # Initialize session state
 def initialize_session():
@@ -151,17 +168,18 @@ def initialize_session():
     if "branch_results" not in st.session_state:
         st.session_state.branch_results = []
 
+
 # Initialize the agent
 def initialize_agent():
     computer_type = st.session_state.computer_type
     start_url = st.session_state.start_url
     initial_task = st.session_state.initial_task
     num_branches = st.session_state.num_branches
-    
+
     if not initial_task.strip():
         st.error("Please provide an initial task before initializing the agent.")
         return
-    
+
     computer_mapping = {
         "local-playwright": LocalPlaywrightComputer,
         "docker": DockerComputer,
@@ -170,73 +188,94 @@ def initialize_agent():
         "scrapybara-ubuntu": ScrapybaraUbuntu,
         "morph": MorphComputer,
     }
-    
+
     ComputerClass = computer_mapping[computer_type]
-    
+
     # Initialize the computer and branching agent using a context manager
     with ComputerClass() as computer:
         st.session_state.computer = computer
-        
+
         # Use BranchingAgent like in cli.py
         agent = BranchingAgent(
-            computer=computer, 
+            computer=computer,
             agent_kwargs={
-                "initial_task": initial_task, 
-                "system_prompt": SYSTEM_PROMPT, 
-                "max_steps": 1000
-            }
+                "initial_task": initial_task,
+                "system_prompt": SYSTEM_PROMPT,
+                "max_steps": 1000,
+            },
         )
-        
+
         # Set up branching like in cli.py
         agent.shared_context = initial_task
         agent.branch_instructions = []
         for i in range(num_branches):
             branch_instruction = f"branch {i+1}: try a different approach for solving the user task from this"
             agent.branch_instructions.append(branch_instruction)
-        
+
         st.session_state.agent = agent
-        
+
         # Add a system message to the chat
-        st.session_state.messages.append({"role": "assistant", "content": f"Agent initialized with task: {initial_task}\nRunning {num_branches} branches to explore different approaches..."})
-        
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": f"Agent initialized with task: {initial_task}\nRunning {num_branches} branches to explore different approaches...",
+            }
+        )
+
         # Start branching in the background
         try:
             # Clear previous results
             st.session_state.branch_results = []
-            
+
             # Run branches with the computer-first approach
             results = agent.run_branches(
-                instructions=agent.branch_instructions,
-                context=agent.shared_context
+                instructions=agent.branch_instructions, context=agent.shared_context
             )
-            
+
             # Store results
             st.session_state.branch_results = results
-            
+
             # Add results to chat
-            st.session_state.messages.append({"role": "assistant", "content": "Branching completed. Here are the results:"})
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": "Branching completed. Here are the results:",
+                }
+            )
             for i, result in enumerate(results):
-                st.session_state.messages.append({"role": "assistant", "content": f"Branch {i+1}: {result}"})
-            
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": f"Branch {i+1}: {result}"}
+                )
+
             # If a start URL is provided, navigate to it
             if start_url:
                 st.session_state.browser_url = start_url
-                st.session_state.messages.append({"role": "assistant", "content": f"Navigated to {start_url}"})
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": f"Navigated to {start_url}"}
+                )
         except Exception as e:
-            st.session_state.messages.append({"role": "assistant", "content": f"Error running branches: {str(e)}"})
+            st.session_state.messages.append(
+                {"role": "assistant", "content": f"Error running branches: {str(e)}"}
+            )
+
 
 # Process user input and run agent
 def process_user_input(user_input):
     if not st.session_state.agent:
-        st.session_state.messages.append({"role": "assistant", "content": "Agent not initialized. Please provide an initial task and click 'Initialize Agent' in the sidebar."})
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": "Agent not initialized. Please provide an initial task and click 'Start Agent' in the sidebar.",
+            }
+        )
         return
-    
+
     # Add user message to chat
     st.session_state.messages.append({"role": "user", "content": user_input})
-    
+
     # Get the stored agent configuration
     computer_type = st.session_state.computer_type
-    
+
     computer_mapping = {
         "local-playwright": LocalPlaywrightComputer,
         "docker": DockerComputer,
@@ -245,34 +284,36 @@ def process_user_input(user_input):
         "scrapybara-ubuntu": ScrapybaraUbuntu,
         "morph": MorphComputer,
     }
-    
+
     ComputerClass = computer_mapping[computer_type]
-    
+
     # Create message items for the agent
     items = [{"role": "user", "content": user_input}]
-    
+
     # Run the agent with a fresh computer instance using context manager
     try:
         with ComputerClass() as computer:
             # Get the agent from session state
             agent = st.session_state.agent
-            
+
             # Update the agent with the new computer
             agent.computer = computer
-            
+
             # Run the agent and get output
             output_items = agent.run_full_turn(
                 items,
                 print_steps=True,
                 show_images=True,
-                debug=st.session_state.debug_mode
+                debug=st.session_state.debug_mode,
             )
-            
+
             # Process agent responses
             for item in output_items:
                 if item["role"] == "assistant":
-                    st.session_state.messages.append({"role": "assistant", "content": item["content"]})
-                
+                    st.session_state.messages.append(
+                        {"role": "assistant", "content": item["content"]}
+                    )
+
                 # Check if there's a screenshot/browser update
                 if "images" in item and item["images"]:
                     for image in item["images"]:
@@ -281,106 +322,90 @@ def process_user_input(user_input):
                         if "url" in image:
                             st.session_state.browser_url = image["url"]
     except Exception as e:
-        st.session_state.messages.append({"role": "assistant", "content": f"Error running agent: {str(e)}"})
+        st.session_state.messages.append(
+            {"role": "assistant", "content": f"Error running agent: {str(e)}"}
+        )
+
 
 # Main Streamlit app
 def main():
-    st.set_page_config(page_title="AI Agent UI", layout="wide")
+    st.set_page_config(page_title="AI Agent", layout="wide")
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
-    
+
     initialize_session()
-    
+
     # Store a counter in session state to create unique keys
     if "input_key_counter" not in st.session_state:
         st.session_state.input_key_counter = 0
-    
+
     # Sidebar for configuration
     with st.sidebar:
-        st.title("Agent Configuration")
-        
-        # Initial task input
-        st.text_area("Initial Task", key="initial_task", height=100, 
-                     help="Enter the task you want the agent to complete")
-        
-        # Number of branches slider
-        st.session_state.num_branches = st.slider("Number of Branches", min_value=1, max_value=5, value=3,
-                                              help="Number of different approaches to try for solving the task")
-        
+        st.title("Settings")
+
         # Computer type selection
         computer_options = [
-            "morph",  # Set as first option to be default
-            "local-playwright", 
-            "docker", 
-            "browserbase", 
-            "scrapybara-browser", 
-            "scrapybara-ubuntu"
+            "morph",
+            "local-playwright",
+            "docker",
+            "browserbase",
+            "scrapybara-browser",
+            "scrapybara-ubuntu",
         ]
         st.session_state.computer_type = st.selectbox(
-            "Computer Environment", 
-            options=computer_options, 
-            index=0  # Default to morph
+            "Environment",
+            options=computer_options,
+            index=0,
         )
-        
+
         # Start URL input
-        st.session_state.start_url = st.text_input("Start URL", value="https://duckduckgo.com")
-        
+        st.session_state.start_url = st.text_input(
+            "Start URL", value="https://duckduckgo.com"
+        )
+
         # Debug mode
         st.session_state.debug_mode = st.checkbox("Debug Mode", value=False)
-        
+
         # Initialize agent button
-        if st.button("Initialize Agent"):
+        if st.button("Start Agent"):
             initialize_agent()
-        
-        # Add spacing
-        st.markdown("---")
-        
-        # Desktop URL view in sidebar
-        st.header("Desktop View")
-        
-        # Create tabs for each branch plus a "Current" tab
-        tab_titles = ["Current"]
-        for i in range(st.session_state.num_branches):
-            tab_titles.append(f"Branch {i+1}")
-        
-        desktop_tabs = st.tabs(tab_titles)
-        
-        # Display browser view in tabs
-        with desktop_tabs[0]:  # Current tab
-            if st.session_state.browser_url:
-                display_browser_view(st.session_state.browser_url, desktop_tabs[0])
-            else:
-                st.write("Browser will be displayed here after initialization.")
-        
-        # Display branch results in their respective tabs
-        for i in range(min(len(st.session_state.branch_results), st.session_state.num_branches)):
-            with desktop_tabs[i+1]:  # Branch tabs (index offset by 1 because of "Current" tab)
-                st.write(f"Branch {i+1} approach:")
-                st.write(st.session_state.branch_results[i])
-                # If we had specific URLs for each branch, we would display them here
-                st.write("No branch-specific view available")
-    
-    # Main content area for chat only now
-    st.header("Chat")
-    
+
+        # Desktop view in sidebar
+        st.header("Browser View")
+        if st.session_state.browser_url:
+            display_browser_view(st.session_state.browser_url, st.sidebar)
+        else:
+            st.info("Browser will appear here after initialization")
+
+    # Main content area
+    st.title("AI Agent")
+
+    # Task input
+    task_input = st.text_area(
+        "What would you like me to do?",
+        key="initial_task",
+        height=100,
+        help="Describe the task you want the agent to complete",
+    )
+
     # Display chat messages
     chat_container = st.container()
     with chat_container:
         for message in st.session_state.messages:
             message_container(
-                is_user=(message["role"] == "user"),
-                content=message["content"]
+                is_user=(message["role"] == "user"), content=message["content"]
             )
-    
-    # Input for new messages - using a form with a dynamic key
+
+    # Input for new messages
     current_key = f"user_message_{st.session_state.input_key_counter}"
-    with st.form(key=f"chat_form_{st.session_state.input_key_counter}", clear_on_submit=True):
-        user_input = st.text_input("Type your message here...", key=current_key)
+    with st.form(
+        key=f"chat_form_{st.session_state.input_key_counter}", clear_on_submit=True
+    ):
+        user_input = st.text_input("Type your message...", key=current_key)
         submit = st.form_submit_button("Send")
         if submit and user_input.strip():
             process_user_input(user_input)
-            # Increment counter for next render to get a fresh input field
             st.session_state.input_key_counter += 1
-            st.experimental_rerun()
+
 
 if __name__ == "__main__":
     main()

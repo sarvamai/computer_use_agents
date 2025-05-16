@@ -1,29 +1,26 @@
-import subprocess
 import time
-import shlex
-import time
-import base64
-import io
 import traceback
 from morphcloud.api import MorphCloudClient
+
 
 class MorphComputer:
     """
     Base MorphComputer class for interacting with cloud-based VM environments.
-    
+
     This class provides the foundation for creating, managing, and interacting with
     remote desktop environments on the Morph Cloud platform. It supports:
-    
+
     - Creating new instances from scratch or from existing snapshots
     - Managing instance lifecycle (start, stop)
     - Interacting with the desktop environment (mouse, keyboard, screenshots)
     - Creating new snapshots with metadata
-    
+
     A MorphComputer can be initialized in three ways:
     1. With an instance_id to connect to an existing instance
     2. With a snapshot_id to create a new instance from a specific snapshot
     3. Without either, which will create a new instance from the best available snapshot
     """
+
     environment = "linux"
     dimensions = (1280, 800)  # Default from your script
 
@@ -41,7 +38,7 @@ class MorphComputer:
     ):
         """
         Initialize a MorphComputer instance.
-        
+
         Args:
             instance_id (str, optional): ID of an existing instance to connect to
             snapshot_id (str, optional): ID of a specific snapshot to start from
@@ -71,21 +68,27 @@ class MorphComputer:
             # Get existing instance
             self.instance = self.client.instances.get(self.instance_id)
             print(f"Using existing instance: {self.instance_id}")
-            
+
             # Check if instance is running
             if self.instance.status != "running":
                 print(f"Starting instance {self.instance_id}...")
-                self.instance = self.client.instances.start(self.instance_id, ttl_seconds=600)
+                self.instance = self.client.instances.start(self.instance_id)
         # If a specific snapshot_id was provided, use it to create the instance
         elif self.snapshot_id:
             if self.skip_verification:
-                print(f"Skip verification flag is set. Starting instance from snapshot {self.snapshot_id} without validation...")
+                print(
+                    f"Skip verification flag is set. Starting instance from snapshot {self.snapshot_id} without validation..."
+                )
                 try:
-                    self.instance = self.client.instances.start(self.snapshot_id, ttl_seconds=600)
+                    self.instance = self.client.instances.start(self.snapshot_id)
                     self.instance_id = self.instance.id
-                    print(f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}")
+                    print(
+                        f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}"
+                    )
                 except Exception as e:
-                    print(f"Error starting instance from snapshot {self.snapshot_id} even with skip_verification: {e}")
+                    print(
+                        f"Error starting instance from snapshot {self.snapshot_id} even with skip_verification: {e}"
+                    )
                     print(f"Falling back to standard initialization...")
                     self.snapshot_id = None
             else:
@@ -94,95 +97,122 @@ class MorphComputer:
                     # Check if the snapshot exists and is in a usable state
                     snapshot = self.client.snapshots.get(self.snapshot_id)
                     if snapshot.status != "ready":
-                        print(f"Warning: Snapshot {self.snapshot_id} is not in 'ready' state (current: {snapshot.status})")
-                        print("This may cause issues when starting an instance from it.")
+                        print(
+                            f"Warning: Snapshot {self.snapshot_id} is not in 'ready' state (current: {snapshot.status})"
+                        )
+                        print(
+                            "This may cause issues when starting an instance from it."
+                        )
                         # Ask for confirmation before proceeding
-                        consent = input(f"Continue with snapshot {self.snapshot_id} in '{snapshot.status}' state? (y/n): ")
-                        if consent.lower() != 'y':
-                            print("Aborting use of non-ready snapshot. Falling back to standard initialization...")
+                        consent = input(
+                            f"Continue with snapshot {self.snapshot_id} in '{snapshot.status}' state? (y/n): "
+                        )
+                        if consent.lower() != "y":
+                            print(
+                                "Aborting use of non-ready snapshot. Falling back to standard initialization..."
+                            )
                             self.snapshot_id = None
-                    
+
                     if self.snapshot_id:  # If still using the snapshot after validation
-                        print(f"Starting instance from provided snapshot: {self.snapshot_id}...")
-                        self.instance = self.client.instances.start(self.snapshot_id, ttl_seconds=600)
+                        print(
+                            f"Starting instance from provided snapshot: {self.snapshot_id}..."
+                        )
+                        self.instance = self.client.instances.start(self.snapshot_id)
                         self.instance_id = self.instance.id
-                        print(f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}")
+                        print(
+                            f"Successfully started instance {self.instance_id} from snapshot {self.snapshot_id}"
+                        )
                 except Exception as e:
                     print(f"Error with snapshot {self.snapshot_id}: {e}")
                     print(f"Falling back to standard initialization...")
                     # Fall back to standard init if the provided snapshot ID fails
                     self.snapshot_id = None
-        
+
         # If no instance_id or valid snapshot_id was provided, use the standard initialization
         if not self.instance_id and not self.snapshot_id:
             # First try to find snapshots with computer-dev-04072025 metadata (fully setup)
-            snapshots = self.client.snapshots.list(metadata={"type": "computer-dev-04072025"})
-            
+            snapshots = self.client.snapshots.list(
+                metadata={"type": "computer-dev-04072025"}
+            )
+
             if snapshots:
                 # Use the most recent computer-dev-04072025 snapshot
                 snapshot = snapshots[0]
                 print(f"Found computer-dev-04072025 snapshot: {snapshot.id}")
                 print(f"Starting instance from ready-to-use snapshot: {snapshot.id}...")
-                self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
+                self.instance = self.client.instances.start(snapshot.id)
                 print(f"Instance: {self.instance.id}")
             else:
                 # If not found, try with regular remote-desktop metadata (needs tools)
-                snapshots = self.client.snapshots.list(metadata={"type": "remote-desktop"})
-                
+                snapshots = self.client.snapshots.list(
+                    metadata={"type": "remote-desktop"}
+                )
+
                 if snapshots:
                     # Use the most recent remote-desktop snapshot
                     snapshot = snapshots[0]
                     print(f"Found remote-desktop snapshot: {snapshot.id}")
-                    print(f"Starting instance from remote-desktop snapshot: {snapshot.id}...")
-                    self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
+                    print(
+                        f"Starting instance from remote-desktop snapshot: {snapshot.id}..."
+                    )
+                    self.instance = self.client.instances.start(snapshot.id)
                     print(f"Instance: {self.instance.id}")
-                    
+
                     # Ensure required tools are installed
                     self._ensure_tools_installed()
                     print("Creating ready-to-use desktop snapshot...")
                     use_snapshot = self.instance.snapshot()
                     print(f"Created use snapshot with ID: {use_snapshot.id}")
-                    
+
                     metadata = {
                         "type": "computer-dev-04072025",
-                        "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
+                        "description": "Ready-to-use remote desktop environment with xdotool and imagemagick",
                     }
-                    print(f"Setting metadata on use snapshot {use_snapshot.id}: {metadata}")
+                    print(
+                        f"Setting metadata on use snapshot {use_snapshot.id}: {metadata}"
+                    )
                     use_snapshot.set_metadata(metadata)
-                    print(f"Successfully set metadata on ready-to-use snapshot: {use_snapshot.id}")
-                
+                    print(
+                        f"Successfully set metadata on ready-to-use snapshot: {use_snapshot.id}"
+                    )
+
                 else:
                     # Create a new instance from scratch
                     print("No suitable snapshot found. Creating new instance...")
-                    snapshot = self._get_or_create_snapshot(self.vcpus, self.memory, self.disk_size)
-                    self.instance = self.client.instances.start(snapshot.id, ttl_seconds=600)
-                    
+                    snapshot = self._get_or_create_snapshot(
+                        self.vcpus, self.memory, self.disk_size
+                    )
+                    self.instance = self.client.instances.start(snapshot.id)
+
                     # Set up full remote desktop environment if needed
                     if self.setup_if_needed:
                         print("Setting up remote desktop environment from scratch...")
                         self._setup_remote_desktop()
-        
+
         # Update instance_id
         self.instance_id = self.instance.id
-                
+
         # Get actual display geometry
         try:
-            geometry = self._exec(f"DISPLAY={self.display} xdotool getdisplaygeometry").strip()
+            geometry = self._exec(
+                f"DISPLAY={self.display} xdotool getdisplaygeometry"
+            ).strip()
             if geometry:
                 w, h = geometry.split()
                 self.dimensions = (int(w), int(h))
                 print(f"Screen dimensions: {self.dimensions[0]}x{self.dimensions[1]}")
         except Exception as e:
             print(f"Could not get display geometry: {e}")
-        
+
         desktop_url = f"https://desktop-{self.instance_id.replace('_', '-')}.http.cloud.morph.so/vnc_lite.html"
         print(f"watch here!")
         print(desktop_url)
-        
+
         if self.auto_open_browser:
             import webbrowser
+
             webbrowser.open(desktop_url)
-            
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -196,21 +226,23 @@ class MorphComputer:
             "type": "base",
             "vcpus": str(vcpus),
             "memory": str(memory),
-            "disk_size": str(disk_size)
+            "disk_size": str(disk_size),
         }
-        
+
         # Try to find an existing snapshot with matching metadata
         print("Looking for existing snapshot with matching configuration...")
         existing_snapshots = self.client.snapshots.list(metadata={"type": "base"})
-        
+
         for snapshot in existing_snapshots:
-            if (snapshot.status == "ready" and
-                snapshot.metadata.get("vcpus") == snapshot_metadata["vcpus"] and
-                snapshot.metadata.get("memory") == snapshot_metadata["memory"] and
-                snapshot.metadata.get("disk_size") == snapshot_metadata["disk_size"]):
+            if (
+                snapshot.status == "ready"
+                and snapshot.metadata.get("vcpus") == snapshot_metadata["vcpus"]
+                and snapshot.metadata.get("memory") == snapshot_metadata["memory"]
+                and snapshot.metadata.get("disk_size") == snapshot_metadata["disk_size"]
+            ):
                 print(f"Found existing snapshot {snapshot.id}")
                 return snapshot
-        
+
         # No matching snapshot found, create a new one
         print("Creating new snapshot...")
         snapshot = self.client.snapshots.create(
@@ -218,40 +250,53 @@ class MorphComputer:
             memory=memory,
             disk_size=disk_size,
         )
-        
+
         # Add metadata to the snapshot
         snapshot.set_metadata(snapshot_metadata)
-        
+
         return snapshot
 
     def _setup_remote_desktop(self):
         """Set up a remote desktop environment on the instance"""
         # Abbreviated setup - using key parts from your original script
-        
+
         # Install required packages
         print("Installing required packages...")
         packages = [
-            "lightdm", "xfce4", "xfce4-goodies", "tigervnc-standalone-server", "tigervnc-common",
-            "python3", "python3-pip", "python3-websockify", "git", "net-tools", 
-            "nginx", "dbus", "dbus-x11", "xfonts-base", "xdotool", "imagemagick"
+            "lightdm",
+            "xfce4",
+            "xfce4-goodies",
+            "tigervnc-standalone-server",
+            "tigervnc-common",
+            "python3",
+            "python3-pip",
+            "python3-websockify",
+            "git",
+            "net-tools",
+            "nginx",
+            "dbus",
+            "dbus-x11",
+            "xfonts-base",
+            "xdotool",
+            "imagemagick",
         ]
         self._exec(
             "DEBIAN_FRONTEND=noninteractive apt-get update -q && "
             "DEBIAN_FRONTEND=noninteractive apt-get install -y -q "
             f"{' '.join(packages)}"
         )
-        
+
         # Clone noVNC repository
         self._exec("git clone https://github.com/novnc/noVNC.git /opt/noVNC")
-        
+
         # Kill any existing VNC processes
         self._exec("pkill Xvnc || true; rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 || true")
-        
+
         # Create necessary directories
         for directory in ["xfce4", "xfce4-session", "autostart", "systemd"]:
             self._exec(f"mkdir -p /root/.config/{directory}")
-        
-        # Create VNC server service
+
+            # Create VNC server service
             vncserver_service = """
     [Unit]
     Description=VNC Server for X11
@@ -270,8 +315,12 @@ class MorphComputer:
     [Install]
     WantedBy=multi-user.target
     """
-        self._exec(f"cat > /etc/systemd/system/vncserver.service << 'EOF'\n{vncserver_service}\nEOF")
-        self._exec(f"cat > /etc/systemd/system/novnc.service << 'EOF'\n{vncserver_service}\nEOF")
+        self._exec(
+            f"cat > /etc/systemd/system/vncserver.service << 'EOF'\n{vncserver_service}\nEOF"
+        )
+        self._exec(
+            f"cat > /etc/systemd/system/novnc.service << 'EOF'\n{vncserver_service}\nEOF"
+        )
 
         # Create and configure other services (abbreviated)
         session_script = """#!/bin/bash
@@ -296,10 +345,12 @@ sleep 2
 # Start XFCE session
 exec startxfce4
 """
-        self._exec(f"cat > /usr/local/bin/start-xfce-session << 'EOF'\n{session_script}\nEOF")
+        self._exec(
+            f"cat > /usr/local/bin/start-xfce-session << 'EOF'\n{session_script}\nEOF"
+        )
         self._exec("chmod +x /usr/local/bin/start-xfce-session")
         self._exec("./usr/local/bin/start-xfce-session")
-        
+
         # Create and start services
         services = ["vncserver", "xfce-session", "novnc", "nginx"]
         self._exec("systemctl daemon-reload")
@@ -315,55 +366,58 @@ exec startxfce4
                 self._exec("systemctl start novnc")
             else:
                 self._exec(f"systemctl enable {service} && systemctl restart {service}")
-        
+
         # Expose HTTP service
         self.instance.expose_http_service("desktop", 80)
-        
+
         # Allow time for services to start
         print("Waiting for services to fully start...")
         time.sleep(10)
-        
+
         # Create a snapshot of the base remote desktop (without tools)
         try:
             print("Creating remote-desktop snapshot...")
             remote_desktop_snapshot = self.instance.snapshot()
             print(f"Created snapshot with ID: {remote_desktop_snapshot.id}")
-            
+
             metadata = {
                 "type": "remote-desktop",
-                "description": "Remote desktop environment with XFCE and noVNC"
+                "description": "Remote desktop environment with XFCE and noVNC",
             }
-            print(f"Setting metadata on snapshot {remote_desktop_snapshot.id}: {metadata}")
+            print(
+                f"Setting metadata on snapshot {remote_desktop_snapshot.id}: {metadata}"
+            )
             remote_desktop_snapshot.set_metadata(metadata)
-            print(f"Successfully set metadata on remote-desktop snapshot: {remote_desktop_snapshot.id}")
+            print(
+                f"Successfully set metadata on remote-desktop snapshot: {remote_desktop_snapshot.id}"
+            )
         except Exception as e:
             print(f"Error creating or setting metadata on remote-desktop snapshot: {e}")
             print(f"Error details: {traceback.format_exc()}")
             # Continue setup even if snapshot creation fails
-        
+
         # Now install the additional tools needed for computer-dev-04072025
-        tools = {
-            "xdotool": "xdotool",
-            "imagemagick": "imagemagick"
-        }
-        
+        tools = {"xdotool": "xdotool", "imagemagick": "imagemagick"}
+
         for tool, package in tools.items():
             print(f"Installing {tool}...")
             self._exec(f"apt-get update && apt-get install -y {package}")
-        
+
         # Create the fully setup use snapshot
         try:
             print("Creating ready-to-use desktop snapshot...")
             use_snapshot = self.instance.snapshot()
             print(f"Created use snapshot with ID: {use_snapshot.id}")
-            
+
             metadata = {
                 "type": "computer-dev-04072025",
-                "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
+                "description": "Ready-to-use remote desktop environment with xdotool and imagemagick",
             }
             print(f"Setting metadata on use snapshot {use_snapshot.id}: {metadata}")
             use_snapshot.set_metadata(metadata)
-            print(f"Successfully set metadata on ready-to-use snapshot: {use_snapshot.id}")
+            print(
+                f"Successfully set metadata on ready-to-use snapshot: {use_snapshot.id}"
+            )
         except Exception as e:
             print(f"Error creating or setting metadata on ready-to-use snapshot: {e}")
             print(f"Error details: {traceback.format_exc()}")
@@ -375,12 +429,14 @@ exec startxfce4
         try:
             snapshot_info = self.client.snapshots.get(self.instance.snapshot_id)
             if snapshot_info.metadata.get("type") == "computer-dev-04072025":
-                print("Using ready-to-use desktop snapshot, all tools already installed")
+                print(
+                    "Using ready-to-use desktop snapshot, all tools already installed"
+                )
                 return
         except:
             # If we can't determine the snapshot type, proceed with checking tools
             pass
-        
+
         # Check if we're starting from a remote-desktop snapshot (needs tools only)
         is_remote_desktop = False
         try:
@@ -391,13 +447,10 @@ exec startxfce4
         except:
             # If we can't determine the snapshot type, proceed normally
             pass
-        
+
         # Required tools for use
-        tools = {
-            "xdotool": "xdotool",
-            "imagemagick": "imagemagick"
-        }
-        
+        tools = {"xdotool": "xdotool", "imagemagick": "imagemagick"}
+
         # Install missing tools
         tools_installed = False
         for tool, package in tools.items():
@@ -408,63 +461,71 @@ exec startxfce4
                 print(f"Installing {tool}...")
                 self._exec(f"apt-get update && apt-get install -y {package}")
                 tools_installed = True
-        
+
         # Create a use snapshot if we upgraded from remote-desktop to computer-dev-04072025
         if is_remote_desktop and tools_installed and self.setup_if_needed:
             try:
                 print("Creating computer-dev-04072025 snapshot for future use...")
                 use_snapshot = self.instance.snapshot()
                 print(f"Created upgrade snapshot with ID: {use_snapshot.id}")
-                
+
                 metadata = {
                     "type": "computer-dev-04072025",
-                    "description": "Ready-to-use remote desktop environment with xdotool and imagemagick"
+                    "description": "Ready-to-use remote desktop environment with xdotool and imagemagick",
                 }
-                print(f"Setting metadata on upgrade snapshot {use_snapshot.id}: {metadata}")
+                print(
+                    f"Setting metadata on upgrade snapshot {use_snapshot.id}: {metadata}"
+                )
                 use_snapshot.set_metadata(metadata)
-                print(f"Successfully set metadata on upgrade snapshot: {use_snapshot.id}")
+                print(
+                    f"Successfully set metadata on upgrade snapshot: {use_snapshot.id}"
+                )
             except Exception as e:
                 print(f"Error creating or setting metadata on upgrade snapshot: {e}")
                 print(f"Error details: {traceback.format_exc()}")
                 # Continue even if snapshot creation fails
-    
+
     def _exec(self, command, sudo=False, max_retries=3):
         """Run a command on the instance via morphcloud API"""
         if sudo:
-            if '|' in command or '>' in command or '<' in command or ';' in command:
+            if "|" in command or ">" in command or "<" in command or ";" in command:
                 # For commands with shell operators, use sh -c
                 command = f"sudo sh -c '{command}'"
             else:
                 # Simple prepend for basic commands
                 command = f"sudo {command}"
-        
+
         # Implement silent retry with exponential backoff for 500 errors
         retry_count = 0
         backoff_time = 0.1  # Start with 0.1 second
-        
+
         while True:
             try:
                 result = self.instance.exec(command)
-                
+
                 # If successful or non-500 error, proceed normally
                 if result.exit_code != 0:
-                    raise RuntimeError(f"Command failed: {command}\nError: {result.stderr}")
-                
+                    raise RuntimeError(
+                        f"Command failed: {command}\nError: {result.stderr}"
+                    )
+
                 return result.stdout
-                
+
             except Exception as e:
                 # Check if it's a 500 error
                 error_str = str(e)
                 is_500_error = "500" in error_str
-                
+
                 # If it's not a 500 error or we've exceeded retries, raise the error
                 if not is_500_error or retry_count >= max_retries:
                     raise
-                
+
                 # Otherwise, silently retry with backoff
                 retry_count += 1
                 time.sleep(backoff_time)
-                backoff_time = min(backoff_time * 2, 1.0)  # Double backoff time, max 1 second
+                backoff_time = min(
+                    backoff_time * 2, 1.0
+                )  # Double backoff time, max 1 second
 
     def screenshot(self):
         """Takes a screenshot, returning base64-encoded PNG"""
@@ -482,7 +543,9 @@ exec startxfce4
 
     def double_click(self, x, y):
         """Double-click at specified coordinates"""
-        self._exec(f"DISPLAY={self.display} xdotool mousemove {x} {y} click --repeat 2 1")
+        self._exec(
+            f"DISPLAY={self.display} xdotool mousemove {x} {y} click --repeat 2 1"
+        )
 
     def scroll(self, x, y, scroll_x, scroll_y):
         """Scroll at specified coordinates"""
@@ -535,9 +598,13 @@ exec startxfce4
             return
         start_x = path[0]["x"]
         start_y = path[0]["y"]
-        self._exec(f"DISPLAY={self.display} xdotool mousemove {start_x} {start_y} mousedown 1")
+        self._exec(
+            f"DISPLAY={self.display} xdotool mousemove {start_x} {start_y} mousedown 1"
+        )
         for point in path[1:]:
-            self._exec(f"DISPLAY={self.display} xdotool mousemove {point['x']} {point['y']}")
+            self._exec(
+                f"DISPLAY={self.display} xdotool mousemove {point['x']} {point['y']}"
+            )
         self._exec(f"DISPLAY={self.display} xdotool mouseup 1")
 
     def get_desktop_url(self):
@@ -545,21 +612,25 @@ exec startxfce4
         # Refresh instance data
         self.instance = self.client.instances.get(self.instance_id)
         desktop_service = next(
-            (svc for svc in self.instance.networking.http_services if svc.name == "desktop"), 
-            None
+            (
+                svc
+                for svc in self.instance.networking.http_services
+                if svc.name == "desktop"
+            ),
+            None,
         )
         if desktop_service:
             return f"{desktop_service.url}/vnc_lite.html"
         return f"https://desktop-{self.instance_id.replace('_', '-')}.http.cloud.morph.so/vnc_lite.html"
-    
+
     def create_snapshot(self, description=None, metadata=None):
         """
         Create a snapshot of the current computer state.
-        
+
         Args:
             description (str, optional): Human-readable description of the snapshot
             metadata (dict, optional): Additional metadata to store with the snapshot
-            
+
         Returns:
             The snapshot object, not just the ID
         """
@@ -567,14 +638,14 @@ exec startxfce4
         snapshot = self.instance.snapshot()
         snapshot_id = snapshot.id
         print(f"Created snapshot {snapshot_id}")
-        
+
         # Add metadata if provided
         if metadata:
             print(f"Setting metadata on snapshot {snapshot_id}")
             snapshot.set_metadata(metadata)
-        
+
         return snapshot  # Return the full snapshot object
-        
+
     def cleanup(self):
         """
         Clean up resources used by this computer.
@@ -589,23 +660,27 @@ exec startxfce4
             return False
 
     @classmethod
-    def from_snapshot(cls, snapshot, auto_open_browser=False, skip_verification=False, **kwargs):
+    def from_snapshot(
+        cls, snapshot, auto_open_browser=False, skip_verification=False, **kwargs
+    ):
         """
         Create a new MorphComputer instance from a snapshot object or ID.
-        
+
         Args:
             snapshot: A snapshot object or snapshot ID string
             auto_open_browser (bool): Whether to open browser automatically
             skip_verification (bool): Whether to skip snapshot verification
             **kwargs: Additional arguments for MorphComputer
-            
+
         Returns:
             A new MorphComputer instance
         """
         # Handle either snapshot object or snapshot ID
-        snapshot_id = snapshot.id if hasattr(snapshot, 'id') else snapshot
-        
-        return cls(snapshot_id=snapshot_id, 
-                   auto_open_browser=auto_open_browser,
-                   skip_verification=skip_verification,
-                   **kwargs)
+        snapshot_id = snapshot.id if hasattr(snapshot, "id") else snapshot
+
+        return cls(
+            snapshot_id=snapshot_id,
+            auto_open_browser=auto_open_browser,
+            skip_verification=skip_verification,
+            **kwargs,
+        )
