@@ -28,17 +28,19 @@ This fork enhances the OpenAI Computer Using Agent sample app with Morph Cloud i
 To use Morph Cloud with the CUA sample app:
 
 ```bash
-# Set up Python environment
-python3 -m venv env
-source env/bin/activate
+# Set up Python environment with conda
+conda create -n manas python=3.11
+conda activate manas
 pip install -r requirements.txt
 
 # Install Morph Cloud and set API key
+
+
 pip install morphcloud
 export MORPH_API_KEY=your_api_key_here 
 
 # Run with Morph Cloud
-python cli.py --computer morph
+python cli.py --input "Open tokyo wikipedia page" --storage-folder ./trajectory --computer morph
 ```
 
 ### Exploring Infinibranch Capabilities
