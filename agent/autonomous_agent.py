@@ -7,6 +7,8 @@ import threading
 import json
 import random
 import os
+import base64
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Callable, Union
 
 from rich.console import Console
@@ -125,47 +127,36 @@ class AutonomousAgent:
                     branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                     console.print(f"[bold cyan]{branch_prefix}Created branch storage folder: {self.storage_folder}[/]")
             elif self.verbose_boot:
-                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
-                console.print(f"[bold cyan]{branch_prefix}Using storage folder: {self.storage_folder}[/]")
+                console.print(f"[bold cyan]Using storage folder: {self.storage_folder}[/]")
                 
-            # Create a JSON file with agent configuration details
-            if self.storage_folder:
-                try:
-                    # Get computer instance info if available
-                    instance_id = None
-                    snapshot_id = None
-                    if computer and hasattr(computer, 'instance') and hasattr(computer.instance, 'id'):
-                        instance_id = computer.instance.id
-                    if computer and hasattr(computer, 'snapshot_id'):
-                        snapshot_id = computer.snapshot_id
-                        
-                    # Create configuration data
-                    config_data = {
-                        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "branch_id": self.branch_id,
-                        "model": model,
-                        "system_prompt": system_prompt,
-                        "initial_task": initial_task,
-                        "max_steps": max_steps,
-                        "step_delay": step_delay,
-                        "temperature": temperature,
-                        "instance_id": instance_id,
-                        "snapshot_id": snapshot_id,
-                        "environment": computer.environment if computer else None
-                    }
-                    
-                    # Write configuration to file
-                    config_file = os.path.join(self.storage_folder, "agent_config.json")
-                    with open(config_file, 'w') as f:
-                        json.dump(config_data, f, indent=2)
-                        
-                    if self.verbose_boot:
-                        branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
-                        console.print(f"[bold green]{branch_prefix}Created configuration file: {config_file}[/]")
-                except Exception as e:
-                    # Don't fail initialization if config creation fails
+            # Create screenshots subfolder
+            self.screenshots_folder = os.path.join(self.storage_folder, "screenshots")
+            os.makedirs(self.screenshots_folder, exist_ok=True)
+            if self.verbose_boot:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                console.print(f"[bold cyan]{branch_prefix}Created screenshots folder: {self.screenshots_folder}[/]")
+                
+            # Initialize trajectory record
+            self.trajectory_file = os.path.join(self.storage_folder, "trajectory.json")
+            self.trajectory = {
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "branch_id": self.branch_id,
+                "actions": [],
+                "interactions": [],
+                "completion": None
+            }
+            self.screenshot_counter = 0
+            
+            # Save initial trajectory file
+            try:
+                with open(self.trajectory_file, 'w') as f:
+                    json.dump(self.trajectory, f, indent=2)
+                if self.verbose_boot:
                     branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
-                    console.print(f"[bold red]{branch_prefix}Error creating configuration file: {str(e)}[/]")
+                    console.print(f"[bold green]{branch_prefix}Created trajectory file: {self.trajectory_file}[/]")
+            except Exception as e:
+                branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                console.print(f"[bold red]{branch_prefix}Error creating trajectory file: {str(e)}[/]")
         
         if self.verbose_boot:
             branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
@@ -337,10 +328,100 @@ class AutonomousAgent:
         except:
             return "0"  # Default color
             
+    def _sanitize_for_json(self, data):
+        """Sanitize data for JSON serialization, removing or truncating problematic fields."""
+        if isinstance(data, list):
+            return [self._sanitize_for_json(item) for item in data]
+        elif isinstance(data, dict):
+            result = {}
+            for k, v in data.items():
+                # Skip binary data or excessively large fields
+                if k == "binary_data" or k == "image_data":
+                    result[k] = "<binary data omitted>"
+                # Recursively sanitize nested structures
+                else:
+                    result[k] = self._sanitize_for_json(v)
+            return result
+        # Handle specific types that might cause JSON serialization issues
+        elif isinstance(data, (int, float, str, bool)) or data is None:
+            return data
+        else:
+            # Convert other types to strings
+            return str(data)
+            
+    def _save_trajectory_file(self):
+        """Save the trajectory to file."""
+        if not hasattr(self, 'trajectory') or not hasattr(self, 'trajectory_file'):
+            return
+            
+        try:
+            with open(self.trajectory_file, 'w') as f:
+                json.dump(self.trajectory, f, indent=2)
+        except Exception as e:
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+            console.print(f"[bold red]{branch_prefix}Error saving trajectory file: {str(e)}[/]")
+
+    def _record_in_trajectory(self, action_type: str, data: Dict[str, Any], conversation_id: Optional[str] = None):
+        """Record an action in the trajectory file."""
+        if not hasattr(self, 'trajectory') or not hasattr(self, 'trajectory_file'):
+            return
+            
+        try:
+            # Prepare action data with timestamp
+            action = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+                "type": action_type,
+            }
+            
+            # Add conversation ID if provided
+            if conversation_id:
+                action["conversation_id"] = conversation_id
+                
+            # Add all other data
+            action.update(data)
+            
+            # Append to actions list
+            self.trajectory["actions"].append(action)
+            
+            # Save to file every 5 actions to reduce I/O
+            if len(self.trajectory["actions"]) % 5 == 0:
+                self._save_trajectory_file()
+        except Exception as e:
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+            console.print(f"[bold red]{branch_prefix}Error recording trajectory: {str(e)}[/]")
+    
+    def _record_interaction(self, interaction_type: str, data: Dict[str, Any]):
+        """Record an API interaction in the trajectory file."""
+        if not hasattr(self, 'trajectory') or not hasattr(self, 'trajectory_file'):
+            return
+            
+        try:
+            # Prepare interaction data with timestamp
+            interaction = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"),
+                "type": interaction_type,
+            }
+                
+            # Add all other data
+            interaction.update(data)
+            
+            # Append to interactions list
+            self.trajectory["interactions"].append(interaction)
+            
+            # Save to file every 2 interactions or if this is a response
+            if interaction_type == "response" or len(self.trajectory["interactions"]) % 2 == 0:
+                self._save_trajectory_file()
+        except Exception as e:
+            branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+            console.print(f"[bold red]{branch_prefix}Error recording interaction: {str(e)}[/]")
+            
     def _run_loop(self):
         """Main execution loop for the autonomous agent."""
         # Initialize conversation items
         items = [{"role": "user", "content": self.initial_task}]
+        
+        # Generate a conversation ID for tracking in the trajectory
+        conversation_id = f"conversation_{int(time.time())}"
         
         # Run initial turn
         branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
@@ -370,6 +451,16 @@ class AutonomousAgent:
                 self.agent.print_steps = self._custom_print_wrapper(original_print_steps)
             
             try:
+                # Record API request in trajectory interactions list
+                if hasattr(self, 'trajectory'):
+                    self._record_interaction("request", {
+                        "conversation_id": conversation_id,
+                        "model": self.agent.model,
+                        "items": self._sanitize_for_json(items),
+                        "tools": self._sanitize_for_json(self.agent.tools),
+                        "truncation": "auto"
+                    })
+                
                 # Create response with retry and exponential backoff
                 response = retry_with_exponential_backoff(
                     lambda: create_response(
@@ -385,6 +476,15 @@ class AutonomousAgent:
                     console.print(f"[bold red]{branch_prefix}No output from model[/]")
                     self.running = False
                     return
+                
+                # Record API response in trajectory interactions list
+                if hasattr(self, 'trajectory'):
+                    self._record_interaction("response", {
+                        "conversation_id": conversation_id,
+                        "output": self._sanitize_for_json(response["output"]),
+                        "usage": self._sanitize_for_json(response.get("usage", {})),
+                        "finish_reason": response.get("finish_reason", None)
+                    })
                 
                 # Add the output to our conversation
                 items += response["output"]
@@ -483,6 +583,16 @@ class AutonomousAgent:
                     self.agent.print_steps = self._custom_print_wrapper(original_print_steps)
                 
                 try:
+                    # Record API request in trajectory interactions list
+                    if hasattr(self, 'trajectory'):
+                        self._record_interaction("request", {
+                            "conversation_id": conversation_id,
+                            "model": self.agent.model,
+                            "items": self._sanitize_for_json(items),
+                            "tools": self._sanitize_for_json(self.agent.tools),
+                            "truncation": "auto"
+                        })
+                    
                     # Create response with retry and exponential backoff
                     response = retry_with_exponential_backoff(
                         lambda: create_response(
@@ -497,6 +607,15 @@ class AutonomousAgent:
                         branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
                         console.print(f"[bold red]{branch_prefix}No output from model[/]")
                         break
+                    
+                    # Record API response in trajectory interactions list
+                    if hasattr(self, 'trajectory'):
+                        self._record_interaction("response", {
+                            "conversation_id": conversation_id,
+                            "output": self._sanitize_for_json(response["output"]),
+                            "usage": self._sanitize_for_json(response.get("usage", {})),
+                            "finish_reason": response.get("finish_reason", None)
+                        })
                     
                     # Add the output to our conversation
                     items += response["output"]
@@ -607,6 +726,34 @@ class AutonomousAgent:
                 screenshot_base64 = self.agent.computer.screenshot()
                 if self.show_images:
                     show_image(screenshot_base64)
+                
+                # Save screenshot to file
+                if hasattr(self, 'screenshots_folder'):
+                    screenshot_name = f"screenshot_{self.screenshot_counter}.png"
+                    screenshot_file = os.path.join(self.screenshots_folder, screenshot_name)
+                    with open(screenshot_file, 'wb') as f:
+                        f.write(base64.b64decode(screenshot_base64))
+                    self.screenshot_counter += 1
+            
+            # Record action in trajectory
+            if hasattr(self, 'trajectory'):
+                action_data = {
+                    "type": action_type,
+                    "args": action_args,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                # Add screenshot name for any action that triggered a screenshot
+                if hasattr(self, 'screenshots_folder') and hasattr(self.agent.computer, "screenshot"):
+                    action_data["screenshot_name"] = f"screenshot_{self.screenshot_counter-1}.png"
+                
+                self.trajectory["actions"].append(action_data)
+                try:
+                    with open(self.trajectory_file, 'w') as f:
+                        json.dump(self.trajectory, f, indent=2)
+                except Exception as e:
+                    branch_prefix = f"[{self.branch_id}] " if self.branch_id else ""
+                    console.print(f"[bold red]{branch_prefix}Error saving trajectory: {str(e)}[/]")
         
         # Delegate to the base agent's handle_item method
         return self.agent.handle_item(item)

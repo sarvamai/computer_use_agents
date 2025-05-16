@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 from agent.agent import Agent
 from agent.autonomous_agent import AutonomousAgent
 from agent.branching_agent import BranchingAgent
@@ -130,6 +131,15 @@ def main():
     if args.storage_folder:
         os.makedirs(args.storage_folder, exist_ok=True)
         print(f"Storage folder initialized at: {args.storage_folder}")
+        
+        # Create a timestamped subfolder for this run
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        timestamped_folder = os.path.join(args.storage_folder, f"trajectory_{timestamp}")
+        os.makedirs(timestamped_folder, exist_ok=True)
+        print(f"Created timestamped subfolder: {timestamped_folder}")
+        
+        # Update storage_folder to use the timestamped subfolder
+        args.storage_folder = timestamped_folder
 
     computer_mapping = {
         "local-playwright": LocalPlaywrightComputer,
