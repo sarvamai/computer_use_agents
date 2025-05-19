@@ -65,3 +65,4 @@ tqdm==4.67.1
 typing_extensions==4.12.2
 tzdata==2025.2
 urllib3==2.3.0
+azure-storage-blob==12.19.0
