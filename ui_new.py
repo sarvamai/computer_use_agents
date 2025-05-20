@@ -1,10 +1,5 @@
-# app.py
 import streamlit as st
 import streamlit.components.v1 as components
-
-# import webbrowser
-
-# webbrowser.open = lambda *args, **kwargs: None
 
 from agent.branching_agent import BranchingAgent
 from computers import (
@@ -44,8 +39,15 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "agent" not in st.session_state:
     st.session_state.agent = None
+
+# **Keep a live computer and its URLs**
+if "computer" not in st.session_state:
+    st.session_state.computer = None
 if "browser_url" not in st.session_state:
     st.session_state.browser_url = ""
+if "desktop_url" not in st.session_state:
+    st.session_state.desktop_url = ""
+
 if "environment" not in st.session_state:
     st.session_state.environment = "morph"
 if "num_branches" not in st.session_state:
@@ -54,66 +56,76 @@ if "num_branches" not in st.session_state:
 
 def initialize_agent(task: str):
     ComputerClass = computer_mapping[st.session_state.environment]
-    # 2) Spin up the computer WITHOUT launching a real browser
-    with ComputerClass() as computer:
-        # capture its internal browser URL for embedding
-        try:
-            st.session_state.browser_url = computer.get_browser_url()
-        except Exception:
-            st.session_state.browser_url = ""
-        agent = BranchingAgent(
-            computer=computer,
-            agent_kwargs={
-                "initial_task": task,
-                "system_prompt": SYSTEM_PROMPT,
-                "max_steps": 1000,
-            },
-        )
-        st.session_state.agent = agent
+    # Create and keep the computer alive
+    computer = ComputerClass()
+    computer.__enter__()
+    st.session_state.computer = computer
+
+    # Capture both browser and desktop URLs
+    try:
+        st.session_state.browser_url = computer.get_browser_url()
+    except Exception:
+        st.session_state.browser_url = ""
+    try:
+        st.session_state.desktop_url = computer.get_desktop_url()
+        print("Desktop URL:", st.session_state.desktop_url)
+    except Exception:
+        st.session_state.desktop_url = ""
+
+    agent = BranchingAgent(
+        computer=computer,
+        agent_kwargs={
+            "initial_task": task,
+            "system_prompt": SYSTEM_PROMPT,
+            "max_steps": 1000,
+        },
+    )
+    st.session_state.agent = agent
+    st.session_state.messages.append(
+        {"role": "assistant", "content": f"Agent initialized with task: {task}"}
+    )
+
+    branches = [
+        f"branch {i+1}: try a different approach"
+        for i in range(st.session_state.num_branches)
+    ]
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": f"Running {st.session_state.num_branches} branches...",
+        }
+    )
+    results = agent.run_branches(instructions=branches, context=task)
+    st.session_state.messages.append(
+        {"role": "assistant", "content": "Branching completed. Results:"}
+    )
+    for i, res in enumerate(results):
         st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": f"Agent initialized with task: {task}",
-            }
+            {"role": "assistant", "content": f"Branch {i+1}: {res}"}
         )
-        # run your branches…
-        branches = [
-            f"branch {i+1}: try a different approach"
-            for i in range(st.session_state.num_branches)
-        ]
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": f"Running {st.session_state.num_branches} branches...",  # noqa
-            }
-        )
-        results = agent.run_branches(instructions=branches, context=task)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": "Branching completed. Results:"}
-        )
-        for i, res in enumerate(results):
-            st.session_state.messages.append(
-                {"role": "assistant", "content": f"Branch {i+1}: {res}"}
-            )
 
 
 def process_user_input(user_input: str):
     st.session_state.messages.append({"role": "user", "content": user_input})
-    ComputerClass = computer_mapping[st.session_state.environment]
-    with ComputerClass() as computer:
-        # swap in a fresh computer each turn
-        st.session_state.agent.computer = computer
-        outputs = st.session_state.agent.run_full_turn(
-            [{"role": "user", "content": user_input}],
-            print_steps=True,
-            show_images=True,
-            debug=False,
-        )
-        # again capture if the computer spun up its UI
-        try:
-            st.session_state.browser_url = computer.get_browser_url()
-        except Exception:
-            pass
+    computer = st.session_state.computer
+    st.session_state.agent.computer = computer
+
+    outputs = st.session_state.agent.run_full_turn(
+        [{"role": "user", "content": user_input}],
+        print_steps=True,
+        show_images=True,
+        debug=False,
+    )
+
+    # Update URLs if they changed
+    try:
+        st.session_state.browser_url = computer.get_browser_url()
+    except Exception:
+        pass
+    try:
+        st.session_state.desktop_url = computer.get_desktop_url()
+    except Exception:
+        pass
 
     for item in outputs:
         if item.get("role") == "assistant":
@@ -123,7 +135,6 @@ def process_user_input(user_input: str):
         if item.get("images"):
             for img in item["images"]:
                 if "url" in img:
-                    # this covers any screengrabs or image-based nav
                     st.session_state.browser_url = img["url"]
                     st.session_state.messages.append(
                         {
@@ -143,7 +154,7 @@ with st.sidebar:
     st.session_state.environment = st.selectbox(
         "Environment",
         options=list(computer_mapping.keys()),
-        index=list(computer_mapping.keys()).index(st.session_state.environment),  # noqa
+        index=list(computer_mapping.keys()).index(st.session_state.environment),
     )
     st.session_state.num_branches = st.slider(
         "Number of branches", 1, 5, st.session_state.num_branches
@@ -158,9 +169,7 @@ with st.sidebar:
 
 # Main form
 with st.form("input_form", clear_on_submit=True):
-    user_input = st.text_input(
-        "Enter your task or message:", key="latest_input"
-    )  # noqa
+    user_input = st.text_input("Enter your task or message:", key="latest_input")
     submitted = st.form_submit_button("Submit")
 
 if submitted and user_input:
@@ -177,11 +186,9 @@ for msg in st.session_state.messages:
 # Virtual desktop (if supported)
 st.markdown("---")
 st.header("Virtual Computer View")
-if st.session_state.agent and hasattr(
-    st.session_state.agent.computer, "get_desktop_url"
-):
-    desktop_url = st.session_state.agent.computer.get_desktop_url()
-    components.iframe(desktop_url, height=600)
-    st.write(f"Desktop URL: {desktop_url}")
+print("Desktop URL used in iframe:", st.session_state.desktop_url)
+if st.session_state.desktop_url:
+    components.iframe(st.session_state.desktop_url, height=600)
+    st.write(f"Desktop URL: {st.session_state.desktop_url}")
 else:
     st.write("Virtual computer view will appear here after initialization")
